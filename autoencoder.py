@@ -3,39 +3,43 @@ import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers
 
-# Convert text to numerical representation (ASCII values)
-def text_to_numbers(text):
-    return np.array([ord(c) for c in text]) / 127  # Normalize ASCII values
+# Define character set (HELLO only)
+chars = sorted(set("HELLO"))  # Unique characters: H, E, L, O
+char_to_int = {char: i for i, char in enumerate(chars)}
+int_to_char = {i: char for char, i in char_to_int.items()}
 
-# Convert numbers back to text
-def numbers_to_text(numbers):
-    return ''.join([chr(int(n * 127)) for n in numbers])
+# One-hot encode "HELLO"
+def one_hot_encode(text, num_classes):
+    encoded = np.zeros((len(text), num_classes))
+    for i, char in enumerate(text):
+        encoded[i, char_to_int[char]] = 1
+    return encoded
 
-# Define input text
-plaintext = "HELLO"
-n_input = len(plaintext)  # Number of characters
-
-data = text_to_numbers(plaintext).reshape(1, n_input)
+# One-hot encoded input
+num_classes = len(chars)
+data = one_hot_encode("HELLO", num_classes)
 
 # Define autoencoder model
-encoding_dim = 3  # Smaller than input size to enforce compression
-
-# Encoder
-input_layer = keras.Input(shape=(n_input,))
-encoded = layers.Dense(encoding_dim, activation='relu')(input_layer)
-
-# Decoder
-decoded = layers.Dense(n_input, activation='sigmoid')(encoded)
+input_layer = keras.Input(shape=(num_classes,))
+encoded = layers.Dense(3, activation="relu")(input_layer)  # Compression
+decoded = layers.Dense(num_classes, activation="softmax")(encoded)  # Reconstruction
 
 autoencoder = keras.Model(input_layer, decoded)
-autoencoder.compile(optimizer='adam', loss='mse')
+
+# Compile model
+autoencoder.compile(optimizer="adam", loss="categorical_crossentropy", metrics=["accuracy"])
 
 # Train the model
-autoencoder.fit(data, data, epochs=500, verbose=0)
+autoencoder.fit(data, data, epochs=5000, verbose=0)
 
-# Encrypt (encode) and Decrypt (decode) the message
-encrypted = autoencoder.predict(data)
-decrypted = numbers_to_text(encrypted[0])
+# Encode and decode the input
+encoded_text = autoencoder.layers[1](data).numpy()
+decoded_text = autoencoder.predict(data)
 
-print("Original Text:", plaintext)
-print("Decrypted Text:", decrypted)
+# Convert back to characters
+decoded_chars = [int_to_char[np.argmax(c)] for c in decoded_text]
+
+# Print results
+print("Original Text: ", "HELLO")
+print("Encoded Representation:\n", encoded_text)
+print("Decoded Text: ", "".join(decoded_chars))
